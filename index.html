@@ -1,281 +1,225 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>График занятости сотрудников</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>График занятости сотрудников</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f6f8; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 1em; background: #4285f4; color: #fff; }
+    .header h1 { margin: 0; font-size: 1.5em; }
+    .controls button { margin-left: .5em; padding: .5em 1em; border: none; border-radius: 4px; background: #fff; color: #4285f4; cursor: pointer; }
+    .filters { display: flex; gap: 1em; padding: 1em; background: #fff; }
+    .filters select, .filters input { padding: .5em; border: 1px solid #ccc; border-radius: 4px; }
+    #gantt, #taskTable { margin: 1em; background: #fff; padding: 1em; border-radius: 4px; }
+    #taskTable table { width: 100%; border-collapse: collapse; }
+    #taskTable th, #taskTable td { border: 1px solid #e0e0e0; padding: .5em; text-align: left; }
+    #taskTable th { background: #f0f0f0; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="header-content">
-                <h1>График занятости сотрудников</h1>
-                <div class="current-date" id="currentDate"></div>
-            </div>
-            <div class="header-controls">
-                <button class="btn btn--primary" id="addTaskBtn">Добавить задачу</button>
-                <button class="btn btn--secondary" id="addEmployeeBtn">Добавить сотрудника</button>
-                <button class="btn btn--outline" id="exportExcelBtn">Выгрузить в Excel</button>
-                <button class="btn btn--outline" id="saveDataBtn">Сохранить данные</button>
-                <button class="btn btn--outline" id="loadDataBtn">Загрузить данные</button>
-                <input type="file" id="fileInput" accept=".json" class="hidden">
-            </div>
-        </header>
 
-        <div class="filters">
-            <div class="filter-group">
-                <label class="form-label">Фильтр по сотруднику:</label>
-                <select class="form-control filter-select" id="employeeFilter">
-                    <option value="">Все сотрудники</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label class="form-label">Фильтр по статусу:</label>
-                <select class="form-control filter-select" id="statusFilter">
-                    <option value="">Все статусы</option>
-                    <option value="активная">Активная</option>
-                    <option value="завершена">Завершена</option>
-                    <option value="отменена">Отменена</option>
-                    <option value="не начатая">Не начатая</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label class="form-label">Поиск задач:</label>
-                <input type="text" class="form-control" id="searchInput" placeholder="Введите название задачи...">
-            </div>
-            <div class="filter-group">
-                <label class="form-label">Группировка:</label>
-                <select class="form-control filter-select" id="groupFilter">
-                    <option value="">Без группировки</option>
-                    <option value="employee">По сотруднику</option>
-                    <option value="status">По статусу</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Переключатель видов -->
-        <div class="view-switcher">
-            <button class="btn btn--outline view-btn active" id="bothViewBtn" data-view="both">Оба вида</button>
-            <button class="btn btn--outline view-btn" id="chartViewBtn" data-view="chart">Диаграмма</button>
-            <button class="btn btn--outline view-btn" id="tableViewBtn" data-view="table">Таблица</button>
-        </div>
-
-        <!-- Навигация по времени -->
-        <div class="timeline-navigation" id="timelineNavigation">
-            <button class="btn btn--outline btn--sm" id="prevMonth">← Предыдущий месяц</button>
-            <div class="current-month" id="currentMonth"></div>
-            <button class="btn btn--outline btn--sm" id="nextMonth">Следующий месяц →</button>
-        </div>
-
-        <!-- Диаграмма Ганта -->
-        <div class="main-content" id="ganttSection">
-            <div class="gantt-container">
-                <div class="gantt-header">
-                    <div class="employee-column-header">
-                        <span>Сотрудники</span>
-                    </div>
-                    <div class="timeline-header" id="timelineHeader">
-                        <!-- Временная шкала будет сгенерирована JS -->
-                    </div>
-                </div>
-                <div class="gantt-body" id="ganttBody">
-                    <!-- Диаграмма Ганта будет сгенерирована JS -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Таблица задач -->
-        <div class="table-section" id="tableSection">
-            <div class="table-header">
-                <h2>Список задач</h2>
-                <div class="table-controls">
-                    <button class="btn btn--outline btn--sm" id="selectAllBtn">Выбрать все</button>
-                    <button class="btn btn--outline btn--sm" id="deleteSelectedBtn">Удалить выбранные</button>
-                    <button class="btn btn--outline btn--sm" id="exportTableBtn">Экспорт таблицы</button>
-                </div>
-            </div>
-            <div class="table-container">
-                <table class="tasks-table" id="tasksTable">
-                    <thead>
-                        <tr>
-                            <th class="checkbox-column">
-                                <input type="checkbox" id="selectAllCheckbox">
-                            </th>
-                            <th class="sortable" data-column="employee">
-                                Сотрудник
-                                <span class="sort-indicator"></span>
-                            </th>
-                            <th class="sortable" data-column="type">
-                                Тип
-                                <span class="sort-indicator"></span>
-                            </th>
-                            <th class="sortable" data-column="title">
-                                Описание
-                                <span class="sort-indicator"></span>
-                            </th>
-                            <th class="sortable" data-column="startDate">
-                                Дата начала
-                                <span class="sort-indicator"></span>
-                            </th>
-                            <th class="sortable" data-column="endDate">
-                                Дата окончания
-                                <span class="sort-indicator"></span>
-                            </th>
-                            <th class="sortable" data-column="status">
-                                Статус
-                                <span class="sort-indicator"></span>
-                            </th>
-                            <th class="actions-column">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tasksTableBody">
-                        <!-- Строки таблицы будут сгенерированы JS -->
-                    </tbody>
-                </table>
-            </div>
-            <div class="table-pagination" id="tablePagination">
-                <div class="pagination-info">
-                    Показано <span id="paginationStart">0</span>-<span id="paginationEnd">0</span> из <span id="paginationTotal">0</span> задач
-                </div>
-                <div class="pagination-controls">
-                    <button class="btn btn--outline btn--sm" id="prevPageBtn">← Предыдущая</button>
-                    <span class="pagination-pages" id="paginationPages"></span>
-                    <button class="btn btn--outline btn--sm" id="nextPageBtn">Следующая →</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="task-legend">
-            <div class="legend-title">Легенда:</div>
-            <div class="legend-items">
-                <div class="legend-item">
-                    <div class="legend-color task-type-task status-active"></div>
-                    <span>Задача - активная</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color task-type-task status-not-started"></div>
-                    <span>Задача - не начатая</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color task-type-vacation status-active"></div>
-                    <span>Отпуск - активный</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color task-type-vacation status-not-started"></div>
-                    <span>Отпуск - не начатый</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color status-completed"></div>
-                    <span>Завершена</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color status-cancelled"></div>
-                    <span>Отменена</span>
-                </div>
-            </div>
-        </div>
+  <header class="header">
+    <h1>График занятости сотрудников</h1>
+    <div class="controls">
+      <button id="btnChart">Диаграмма</button>
+      <button id="btnTable">Таблица</button>
+      <button id="btnBoth">Оба вида</button>
     </div>
+  </header>
 
-    <!-- Модальное окно для добавления/редактирования задачи -->
-    <div class="modal hidden" id="taskModal">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="taskModalTitle">Добавить задачу</h3>
-                <button class="modal-close" id="closeTaskModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="taskForm">
-                    <div class="form-group">
-                        <label class="form-label">Сотрудник:</label>
-                        <select class="form-control" id="taskEmployee" required>
-                            <option value="">Выберите сотрудника</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Название задачи:</label>
-                        <input type="text" class="form-control" id="taskTitle" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Описание:</label>
-                        <textarea class="form-control" id="taskDescription" rows="3"></textarea>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Дата начала:</label>
-                            <input type="date" class="form-control" id="taskStartDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Дата окончания:</label>
-                            <input type="date" class="form-control" id="taskEndDate" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Тип задачи:</label>
-                            <select class="form-control" id="taskType" required>
-                                <option value="">Выберите тип</option>
-                                <option value="Задача">Задача</option>
-                                <option value="Отпуск">Отпуск</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Статус:</label>
-                            <select class="form-control" id="taskStatus" required>
-                                <option value="">Выберите статус</option>
-                                <option value="активная">Активная</option>
-                                <option value="завершена">Завершена</option>
-                                <option value="отменена">Отменена</option>
-                                <option value="не начатая">Не начатая</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn btn--secondary" id="cancelTaskBtn">Отмена</button>
-                        <button type="submit" class="btn btn--primary">Сохранить</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+  <div class="filters">
+    <select id="employeeFilter"><option value="">Все сотрудники</option></select>
+    <select id="statusFilter">
+      <option value="">Все статусы</option>
+      <option value="активная">Активная</option>
+      <option value="не начатая">Не начатая</option>
+      <option value="завершена">Завершена</option>
+      <option value="отменена">Отменена</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="Поиск..." />
+    <button id="btnSave">Сохранить</button>
+  </div>
 
-    <!-- Модальное окно для добавления сотрудника -->
-    <div class="modal hidden" id="employeeModal">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Добавить сотрудника</h3>
-                <button class="modal-close" id="closeEmployeeModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="employeeForm">
-                    <div class="form-group">
-                        <label class="form-label">Имя сотрудника:</label>
-                        <input type="text" class="form-control" id="employeeName" required>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn btn--secondary" id="cancelEmployeeBtn">Отмена</button>
-                        <button type="submit" class="btn btn--primary">Добавить</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+  <div id="gantt"></div>
+  <div id="taskTable" style="display:none;"></div>
 
-    <!-- Контекстное меню -->
-    <div class="context-menu hidden" id="contextMenu">
-        <div class="context-menu-item" id="editTask">Редактировать</div>
-        <div class="context-menu-item" id="deleteTask">Удалить</div>
-        <div class="context-menu-item" id="toggleStatus">Изменить статус</div>
-    </div>
+  <script>
+    // ==== Параметры Google Sheets API ====
+    const SHEET_ID = '1jNYZf2xf1HimqzzXaqw1ivs4J_lF6sDPUKwGJnTyV1c';
+    const API_KEY  = ' AIzaSyBQscUL0aVuqKs0EGYvmX5lFNyYmAatGxw';
+    const RANGE    = 'Sheet1!A:H';
+    const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values`;
 
-    <!-- Уведомления -->
-    <div class="notification hidden" id="notification">
-        <span id="notificationText"></span>
-    </div>
+    // ==== Данные ====
+    let employees = [];
+    let tasks = [];
 
-    <script src="app.js"></script>
+    // ==== Загрузка сотрудников (из таблицы) ====
+    function extractEmployees() {
+      const names = [...new Set(tasks.map(t => t.employee))];
+      employees = names.map((name,i) => ({ id: i+1, name }));
+      const sel = document.getElementById('employeeFilter');
+      sel.innerHTML = '<option value="">Все сотрудники</option>';
+      employees.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.name; opt.textContent = e.name;
+        sel.append(opt);
+      });
+    }
+
+    // ==== Загрузить задачи из Google Sheets ====
+    async function loadTasksFromSheet() {
+      const url = `${BASE_URL}/${RANGE}?key=${API_KEY}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.values) return;
+      const rows = data.values.slice(1);
+      tasks = rows.map((r,i) => ({
+        id:       r[7] || i+1,
+        employee: r[0]||'',
+        type:     r[1]||'',
+        title:    r[2]||'',
+        start:    r[3]||'',
+        end:      r[4]||'',
+        comment:  r[5]||'',
+        status:   r[6]||''
+      }));
+      extractEmployees();
+      renderChart();
+      renderTable();
+    }
+
+    // ==== Сохранить задачи в Google Sheets ====
+    async function saveTasksToSheet() {
+      const values = [
+        ['employee','type','title','start','end','comment','status','id'],
+        ...tasks.map(t => [
+          t.employee, t.type, t.title, t.start, t.end, t.comment, t.status, t.id
+        ])
+      ];
+      const url = `${BASE_URL}/${RANGE}?valueInputOption=RAW&key=${API_KEY}`;
+      await fetch(url, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ values })
+      });
+      alert('Данные сохранены');
+    }
+
+    // ==== Отрисовка диаграммы (упрощённый псевдокод) ====
+    function renderChart() {
+      const container = document.getElementById('gantt');
+      container.style.display = ''; container.innerHTML = '';
+      const w = container.clientWidth-40;
+      const h = employees.length*30 + 40;
+      const minDate = new Date(Math.min(...tasks.map(t=>new Date(t.start))));
+      const maxDate = new Date(Math.max(...tasks.map(t=>new Date(t.end))));
+      const daysTotal = (maxDate - minDate)/86400000 +1;
+      // Заголовки сотрудников
+      employees.forEach((emp, i) => {
+        const label = document.createElement('div');
+        label.textContent = emp.name;
+        label.style.position='absolute';
+        label.style.top=(i*30+40)+'px';
+        label.style.left='0';
+        container.append(label);
+      });
+      // Линия времени
+      for(let d=0; d<daysTotal; d += Math.ceil(daysTotal/10)) {
+        const t = new Date(minDate.getTime()+d*86400000);
+        const lbl = document.createElement('div');
+        lbl.textContent = t.toLocaleDateString('ru-RU');
+        lbl.style.position='absolute';
+        lbl.style.top='0';
+        lbl.style.left=(40 + (d/daysTotal)*w)+'px';
+        container.append(lbl);
+      }
+      // Задачи
+      tasks.forEach(t => {
+        const empIndex = employees.findIndex(e=>e.name===t.employee);
+        if(empIndex<0) return;
+        const sd = new Date(t.start), ed=new Date(t.end);
+        const startOffset = (sd - minDate)/86400000/daysTotal;
+        const length = (ed-sd)/86400000/daysTotal;
+        const bar = document.createElement('div');
+        bar.textContent = t.title;
+        bar.style.position='absolute';
+        bar.style.top= empIndex*30+40+'px';
+        bar.style.left= 40 + startOffset*w+'px';
+        bar.style.width= length*w+'px';
+        bar.style.height='20px';
+        bar.style.background = t.type==='Отпуск' ? '#f9a825' : '#1e88e5';
+        bar.style.opacity = t.status==='не начатая'? '0.6':'1';
+        bar.style.color='#fff';
+        bar.style.padding='2px';
+        container.append(bar);
+      });
+      container.style.position='relative';
+      container.style.height=h+'px';
+      container.style.background='#fff';
+      container.style.border='1px solid #ccc';
+    }
+
+    // ==== Отрисовка таблицы ====
+    function renderTable() {
+      const div = document.getElementById('taskTable');
+      div.style.display=''; div.innerHTML = '';
+      const tbl = document.createElement('table');
+      const thead = document.createElement('thead');
+      const hdr = ['Сотрудник','Тип','Название','Начало','Конец','Комментарий','Статус','Действия'];
+      const trh = document.createElement('tr');
+      hdr.forEach(h=>{ const th=document.createElement('th'); th.textContent=h; trh.append(th); });
+      thead.append(trh); tbl.append(thead);
+      const tb = document.createElement('tbody');
+      tasks.forEach((t,i)=>{
+        const tr=document.createElement('tr');
+        ['employee','type','title','start','end','comment','status'].forEach(key=>{
+          const td=document.createElement('td'); td.textContent=t[key]; tr.append(td);
+        });
+        // Действия
+        const tdAct=document.createElement('td');
+        const btnDel=document.createElement('button'); btnDel.textContent='Удалить'; 
+        btnDel.onclick=()=>{
+          tasks.splice(i,1);
+          saveTasksToSheet();
+          renderChart(); renderTable();
+        };
+        tdAct.append(btnDel);
+        tr.append(tdAct);
+        tb.append(tr);
+      });
+      tbl.append(tb);
+      div.append(tbl);
+    }
+
+    // ==== Фильтрация & переключение ====
+    document.getElementById('btnChart').onclick = ()=>{
+      document.getElementById('gantt').style.display = '';
+      document.getElementById('taskTable').style.display = 'none';
+    };
+    document.getElementById('btnTable').onclick = ()=>{
+      document.getElementById('gantt').style.display = 'none';
+      document.getElementById('taskTable').style.display = '';
+    };
+    document.getElementById('btnBoth').onclick = ()=>{
+      document.getElementById('gantt').style.display = '';
+      document.getElementById('taskTable').style.display = '';
+    };
+    document.getElementById('btnSave').onclick = saveTasksToSheet;
+
+    // ==== Вспомогательные функции ====
+    function getEmployeeIdByName(name) {
+      const e = employees.find(e=>e.name===name);
+      return e ? e.id : (employees.push({id:employees.length+1,name}), employees.length);
+    }
+    function getEmployeeNameById(id) {
+      const e = employees.find(e=>e.id===id);
+      return e?e.name:'';
+    }
+
+    // ==== Запуск при загрузке ====
+    document.addEventListener('DOMContentLoaded', loadTasksFromSheet);
+  </script>
 </body>
 </html>
