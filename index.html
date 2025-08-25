@@ -43,42 +43,55 @@
 
   <div id="gantt"></div>
   <div id="taskTable" style="display:none;"></div>
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
 
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyAh3B5Bouyei9OVwzs-rh04cXonGz0m5k4",
-    authDomain: "globusarh.firebaseapp.com",
-    projectId: "globusarh",
-    storageBucket: "globusarh.firebasestorage.app",
-    messagingSenderId: "370557775455",
-    appId: "1:370557775455:web:042a439b8d6d3dadd275ea"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-</script>
+  <!-- Подключение Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-    // ==== Параметры Google Sheets API ====
-    const SHEET_ID = '1jNYZf2xf1HimqzzXaqw1ivs4J_lF6sDPUKwGJnTyV1c';
-    const API_KEY  = ' AIzaSyBQscUL0aVuqKs0EGYvmX5lFNyYmAatGxw';
-    const RANGE    = 'Sheet1!A:H';
-    const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values`;
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSJFWImoEJDvydBbD7T6JjqmyobchOLAEWf2ECFc3gMHDMpDMTxqXbHFlUDKbrOTeL24Up6lLDVANLf/pub?gid=886159203&single=true&output=csv';
+    // ==== Конфигурация Firebase (замените на ваши данные) ====
+    const firebaseConfig = {
+      apiKey: "AIzaSyAh3B5Bouyei9OVwzs-rh04cXonGz0m5k4",
+      authDomain: "globusarh.firebaseapp.com",
+      databaseURL: "https://globusarh-default-rtdb.firebaseio.com",
+      projectId: "globusarh",
+      storageBucket: "globusarh.appspot.com",
+      messagingSenderId: "370557775455 ",
+      appId: "1:370557775455:web:042a439b8d6d3dadd275ea "
+    };
 
-    // ==== Данные ====
+    // Инициализация Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ==== Глобальные переменные ====
     let employees = [];
     let tasks = [];
 
-    // ==== Загрузка сотрудников (из таблицы) ====
+    // ==== Загрузка задач из Firebase ====
+    function loadTasks() {
+      db.ref('tasks').on('value', snapshot => {
+        const data = snapshot.val() || {};
+        tasks = Object.values(data);
+        extractEmployees();
+        renderChart();
+        renderTable();
+      });
+    }
+
+    // ==== Сохранение задач в Firebase ====
+    function saveTasks() {
+      const updates = {};
+      tasks.forEach(t => updates['tasks/' + t.id] = t);
+      db.ref().update(updates)
+        .then(() => alert('Данные сохранены'))
+        .catch(console.error);
+    }
+
+    // ==== Формируем список сотрудников для фильтра ====
     function extractEmployees() {
       const names = [...new Set(tasks.map(t => t.employee))];
-      employees = names.map((name,i) => ({ id: i+1, name }));
+      employees = names.map((n, i) => ({ id: i + 1, name: n }));
       const sel = document.getElementById('employeeFilter');
       sel.innerHTML = '<option value="">Все сотрудники</option>';
       employees.forEach(e => {
@@ -88,179 +101,103 @@
       });
     }
 
-    // ==== Загрузить задачи из Google Sheets ====
-    async function loadTasksFromSheet() {
-      const url = `${BASE_URL}/${RANGE}?key=${API_KEY}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!data.values) return;
-      const rows = data.values.slice(1);
-      tasks = rows.map((r,i) => ({
-        id:       r[7] || i+1,
-        employee: r[0]||'',
-        type:     r[1]||'',
-        title:    r[2]||'',
-        start:    r[3]||'',
-        end:      r[4]||'',
-        comment:  r[5]||'',
-        status:   r[6]||''
-      }));
-      extractEmployees();
-      renderChart();
-      renderTable();
-    }
-
-    // ==== Сохранить задачи в Google Sheets ====
- async function loadTasksFromSheet() {
-  try {
-    // Запрашиваем CSV по публичной ссылке
-    const res  = await fetch(CSV_URL);
-    const text = await res.text();
-    // Преобразуем CSV в массив строк
-    const rows = text.trim().split('\n').map(line => line.split(','));
-    // Первая строка — заголовки, её убираем
-    rows.shift();
-    // Преобразуем каждую строку в объект задачи
-    tasks = rows.map((r, i) => ({
-      id:       Number(r[7]) || i + 1,
-      employee: r[0] || '',
-      type:     r[1] || '',
-      title:    r[2] || '',
-      start:    r[3] || '',
-      end:      r[4] || '',
-      comment:  r[5] || '',
-      status:   r[6] || ''
-    }));
-    // Обновляем список сотрудников и интерфейс
-    extractEmployees();
-    renderChart();
-    renderTable();
-  } catch (err) {
-    console.error('Ошибка загрузки CSV:', err);
-  }
-}
-      const url = `${BASE_URL}/${RANGE}?valueInputOption=RAW&key=${API_KEY}`;
-      await fetch(url, {
-        method: 'PUT',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ values })
-      });
-      alert('Данные сохранены');
-    }
-
-    // ==== Отрисовка диаграммы (упрощённый псевдокод) ====
+    // ==== Отрисовка диаграммы Gantt ====
     function renderChart() {
       const container = document.getElementById('gantt');
       container.style.display = ''; container.innerHTML = '';
-      const w = container.clientWidth-40;
-      const h = employees.length*30 + 40;
-      const minDate = new Date(Math.min(...tasks.map(t=>new Date(t.start))));
-      const maxDate = new Date(Math.max(...tasks.map(t=>new Date(t.end))));
-      const daysTotal = (maxDate - minDate)/86400000 +1;
-      // Заголовки сотрудников
+      if (!tasks.length) return;
+      const w = container.clientWidth - 40;
+      const minDate = new Date(Math.min(...tasks.map(t => new Date(t.start))));
+      const maxDate = new Date(Math.max(...tasks.map(t => new Date(t.end))));
+      const totalDays = (maxDate - minDate) / 86400000 + 1;
+
       employees.forEach((emp, i) => {
         const label = document.createElement('div');
         label.textContent = emp.name;
-        label.style.position='absolute';
-        label.style.top=(i*30+40)+'px';
-        label.style.left='0';
+        label.style.position = 'absolute';
+        label.style.top = (i * 30 + 40) + 'px';
+        label.style.left = '0';
         container.append(label);
       });
-      // Линия времени
-      for(let d=0; d<daysTotal; d += Math.ceil(daysTotal/10)) {
-        const t = new Date(minDate.getTime()+d*86400000);
-        const lbl = document.createElement('div');
-        lbl.textContent = t.toLocaleDateString('ru-RU');
-        lbl.style.position='absolute';
-        lbl.style.top='0';
-        lbl.style.left=(40 + (d/daysTotal)*w)+'px';
-        container.append(lbl);
-      }
-      // Задачи
+
       tasks.forEach(t => {
-        const empIndex = employees.findIndex(e=>e.name===t.employee);
-        if(empIndex<0) return;
-        const sd = new Date(t.start), ed=new Date(t.end);
-        const startOffset = (sd - minDate)/86400000/daysTotal;
-        const length = (ed-sd)/86400000/daysTotal;
+        const empIndex = employees.findIndex(e => e.name === t.employee);
+        if (empIndex < 0) return;
+        const sd = new Date(t.start), ed = new Date(t.end);
+        const left = 40 + ((sd - minDate) / 86400000) / totalDays * w;
+        const width = ((ed - sd) / 86400000) / totalDays * w;
         const bar = document.createElement('div');
         bar.textContent = t.title;
-        bar.style.position='absolute';
-        bar.style.top= empIndex*30+40+'px';
-        bar.style.left= 40 + startOffset*w+'px';
-        bar.style.width= length*w+'px';
-        bar.style.height='20px';
-        bar.style.background = t.type==='Отпуск' ? '#f9a825' : '#1e88e5';
-        bar.style.opacity = t.status==='не начатая'? '0.6':'1';
-        bar.style.color='#fff';
-        bar.style.padding='2px';
+        bar.style.position = 'absolute';
+        bar.style.top = (empIndex * 30 + 40) + 'px';
+        bar.style.left = left + 'px';
+        bar.style.width = width + 'px';
+        bar.style.height = '20px';
+        bar.style.background = t.type === 'Отпуск' ? '#f9a825' : '#1e88e5';
+        bar.style.opacity = t.status === 'не начатая' ? '0.6' : '1';
+        bar.style.color = '#fff';
+        bar.style.padding = '2px';
         container.append(bar);
       });
-      container.style.position='relative';
-      container.style.height=h+'px';
-      container.style.background='#fff';
-      container.style.border='1px solid #ccc';
+
+      container.style.position = 'relative';
+      container.style.height = (employees.length * 30 + 40) + 'px';
+      container.style.border = '1px solid #ccc';
     }
 
     // ==== Отрисовка таблицы ====
     function renderTable() {
       const div = document.getElementById('taskTable');
-      div.style.display=''; div.innerHTML = '';
+      div.style.display = ''; div.innerHTML = '';
       const tbl = document.createElement('table');
       const thead = document.createElement('thead');
-      const hdr = ['Сотрудник','Тип','Название','Начало','Конец','Комментарий','Статус','Действия'];
+      const headers = ['Сотрудник','Тип','Название','Начало','Конец','Комментарий','Статус','Действия'];
       const trh = document.createElement('tr');
-      hdr.forEach(h=>{ const th=document.createElement('th'); th.textContent=h; trh.append(th); });
+      headers.forEach(h => {
+        const th = document.createElement('th'); th.textContent = h;
+        trh.append(th);
+      });
       thead.append(trh); tbl.append(thead);
+
       const tb = document.createElement('tbody');
-      tasks.forEach((t,i)=>{
-        const tr=document.createElement('tr');
-        ['employee','type','title','start','end','comment','status'].forEach(key=>{
-          const td=document.createElement('td'); td.textContent=t[key]; tr.append(td);
+      tasks.forEach((t, i) => {
+        const tr = document.createElement('tr');
+        ['employee','type','title','start','end','comment','status'].forEach(key => {
+          const td = document.createElement('td');
+          td.textContent = t[key];
+          tr.append(td);
         });
-        // Действия
-        const tdAct=document.createElement('td');
-        const btnDel=document.createElement('button'); btnDel.textContent='Удалить'; 
-        btnDel.onclick=()=>{
-          tasks.splice(i,1);
-          saveTasksToSheet();
-          renderChart(); renderTable();
+        const tdAct = document.createElement('td');
+        const btnDel = document.createElement('button');
+        btnDel.textContent = 'Удалить';
+        btnDel.onclick = () => {
+          tasks.splice(i, 1);
+          saveTasks();
         };
         tdAct.append(btnDel);
         tr.append(tdAct);
         tb.append(tr);
       });
-      tbl.append(tb);
-      div.append(tbl);
+      tbl.append(tb); div.append(tbl);
     }
 
-    // ==== Фильтрация & переключение ====
-    document.getElementById('btnChart').onclick = ()=>{
+    // ==== UI: переключение вида и кнопки ====
+    document.getElementById('btnChart').onclick = () => {
       document.getElementById('gantt').style.display = '';
       document.getElementById('taskTable').style.display = 'none';
     };
-    document.getElementById('btnTable').onclick = ()=>{
+    document.getElementById('btnTable').onclick = () => {
       document.getElementById('gantt').style.display = 'none';
       document.getElementById('taskTable').style.display = '';
     };
-    document.getElementById('btnBoth').onclick = ()=>{
+    document.getElementById('btnBoth').onclick = () => {
       document.getElementById('gantt').style.display = '';
       document.getElementById('taskTable').style.display = '';
     };
-    document.getElementById('btnSave').onclick = saveTasksToSheet;
+    document.getElementById('btnSave').onclick = saveTasks;
 
-    // ==== Вспомогательные функции ====
-    function getEmployeeIdByName(name) {
-      const e = employees.find(e=>e.name===name);
-      return e ? e.id : (employees.push({id:employees.length+1,name}), employees.length);
-    }
-    function getEmployeeNameById(id) {
-      const e = employees.find(e=>e.id===id);
-      return e?e.name:'';
-    }
-
-    // ==== Запуск при загрузке ====
-    document.addEventListener('DOMContentLoaded', loadTasksFromSheet);
+    // ==== Инициализация при загрузке страницы ====
+    document.addEventListener('DOMContentLoaded', loadTasks);
   </script>
 </body>
 </html>
