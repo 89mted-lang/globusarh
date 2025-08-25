@@ -45,13 +45,6 @@
   <div id="taskTable" style="display:none;"></div>
 
   <script>
-    // Сохранение задач
-    function saveTasks() {
-      const updates = {};
-      tasks.forEach(t => updates['tasks/' + t.id] = t);
-      db.ref().update(updates).then(() => alert('Данные сохранены'));
-    }
-
     // ==== Параметры Google Sheets API ====
     const SHEET_ID = '1jNYZf2xf1HimqzzXaqw1ivs4J_lF6sDPUKwGJnTyV1c';
     const API_KEY  = ' AIzaSyBQscUL0aVuqKs0EGYvmX5lFNyYmAatGxw';
