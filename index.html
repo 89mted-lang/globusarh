@@ -45,32 +45,6 @@
   <div id="taskTable" style="display:none;"></div>
 
   <script>
-        // ==== Конфигурация Firebase ====
-    const firebaseConfig = {
-      apiKey: "AIzaSyAh3B5Bouyei9OVwzs-rh04cXonGz0m5k4",
-       authDomain: "globusarh.firebaseapp.com",
-  databaseURL: "https://globusarh-default-rtdb.firebaseio.com",
-  projectId: "globusarh",
-      projectId: "globusarh",
-      storageBucket: "globusarh.appspot.com",
-      messagingSenderId: "370557775455",
-      appId: "1:370557775455:web:042a439b8d6d3dadd275ea"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    let employees = [];
-    let tasks = [];
-
-    // Загрузка задач
-    function loadTasks() {
-      db.ref('tasks').on('value', snap => {
-        tasks = Object.values(snap.val() || {});
-        extractEmployees();
-        renderChart();
-        renderTable();
-      });
-    }
     // Сохранение задач
     function saveTasks() {
       const updates = {};
