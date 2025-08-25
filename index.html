@@ -50,6 +50,7 @@
     const API_KEY  = ' AIzaSyBQscUL0aVuqKs0EGYvmX5lFNyYmAatGxw';
     const RANGE    = 'Sheet1!A:H';
     const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values`;
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSJFWImoEJDvydBbD7T6JjqmyobchOLAEWf2ECFc3gMHDMpDMTxqXbHFlUDKbrOTeL24Up6lLDVANLf/pub?gid=886159203&single=true&output=csv';
 
     // ==== Данные ====
     let employees = [];
@@ -91,13 +92,34 @@
     }
 
     // ==== Сохранить задачи в Google Sheets ====
-    async function saveTasksToSheet() {
-      const values = [
-        ['employee','type','title','start','end','comment','status','id'],
-        ...tasks.map(t => [
-          t.employee, t.type, t.title, t.start, t.end, t.comment, t.status, t.id
-        ])
-      ];
+ async function loadTasksFromSheet() {
+  try {
+    // Запрашиваем CSV по публичной ссылке
+    const res  = await fetch(CSV_URL);
+    const text = await res.text();
+    // Преобразуем CSV в массив строк
+    const rows = text.trim().split('\n').map(line => line.split(','));
+    // Первая строка — заголовки, её убираем
+    rows.shift();
+    // Преобразуем каждую строку в объект задачи
+    tasks = rows.map((r, i) => ({
+      id:       Number(r[7]) || i + 1,
+      employee: r[0] || '',
+      type:     r[1] || '',
+      title:    r[2] || '',
+      start:    r[3] || '',
+      end:      r[4] || '',
+      comment:  r[5] || '',
+      status:   r[6] || ''
+    }));
+    // Обновляем список сотрудников и интерфейс
+    extractEmployees();
+    renderChart();
+    renderTable();
+  } catch (err) {
+    console.error('Ошибка загрузки CSV:', err);
+  }
+}
       const url = `${BASE_URL}/${RANGE}?valueInputOption=RAW&key=${API_KEY}`;
       await fetch(url, {
         method: 'PUT',
