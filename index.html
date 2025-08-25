@@ -43,6 +43,25 @@
 
   <div id="gantt"></div>
   <div id="taskTable" style="display:none;"></div>
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyAh3B5Bouyei9OVwzs-rh04cXonGz0m5k4",
+    authDomain: "globusarh.firebaseapp.com",
+    projectId: "globusarh",
+    storageBucket: "globusarh.firebasestorage.app",
+    messagingSenderId: "370557775455",
+    appId: "1:370557775455:web:042a439b8d6d3dadd275ea"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
 
   <script>
     // ==== Параметры Google Sheets API ====
