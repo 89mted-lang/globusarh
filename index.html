@@ -5,16 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>График занятости сотрудников</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f6f8; }
-    .header { display: flex; justify-content: space-between; align-items: center; padding: 1em; background: #4285f4; color: #fff; }
-    .header h1 { margin: 0; font-size: 1.5em; }
-    .controls button { margin-left: .5em; padding: .5em 1em; border: none; border-radius: 4px; background: #fff; color: #4285f4; cursor: pointer; }
-    .filters { display: flex; gap: 1em; padding: 1em; background: #fff; }
-    .filters select, .filters input { padding: .5em; border: 1px solid #ccc; border-radius: 4px; }
-    #gantt, #taskTable { margin: 1em; background: #fff; padding: 1em; border-radius: 4px; }
-    #taskTable table { width: 100%; border-collapse: collapse; }
-    #taskTable th, #taskTable td { border: 1px solid #e0e0e0; padding: .5em; text-align: left; }
-    #taskTable th { background: #f0f0f0; }
+    body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f8; }
+    .header { display:flex; justify-content:space-between; align-items:center; padding:1em; background:#4285f4; color:#fff; }
+    .header h1 { margin:0; font-size:1.5em; }
+    .controls button { margin-left:.5em; padding:.5em 1em; border:none; border-radius:4px; background:#fff; color:#4285f4; cursor:pointer; }
+    .filters { display:flex; gap:1em; padding:1em; background:#fff; }
+    .filters select, .filters input { padding:.5em; border:1px solid #ccc; border-radius:4px; }
+    #gantt, #taskTable, #addForm { margin:1em; background:#fff; padding:1em; border-radius:4px; }
+    #taskTable table { width:100%; border-collapse:collapse; }
+    #taskTable th, #taskTable td { border:1px solid #e0e0e0; padding:.5em; text-align:left; }
+    #taskTable th { background:#f0f0f0; }
+    #addForm { display:none; border:1px solid #ccc; }
+    #addForm label { display:block; margin:5px 0; }
+    #addForm input, #addForm select { padding:5px; width:100%; box-sizing:border-box; }
+    #addForm button { margin:5px 5px 0 0; padding:.5em 1em; }
   </style>
 </head>
 <body>
@@ -39,165 +43,185 @@
     </select>
     <input type="text" id="searchInput" placeholder="Поиск..." />
     <button id="btnSave">Сохранить</button>
+    <button id="btnAdd">Добавить задачу</button>
+  </div>
+
+  <!-- Форма для добавления задач -->
+  <div id="addForm">
+    <h3>Новая задача</h3>
+    <label>Сотрудник: <input type="text" id="fEmployee" /></label>
+    <label>Тип: <input type="text" id="fType" /></label>
+    <label>Название: <input type="text" id="fTitle" /></label>
+    <label>Начало: <input type="date" id="fStart" /></label>
+    <label>Конец: <input type="date" id="fEnd" /></label>
+    <label>Комментарий: <input type="text" id="fComment" /></label>
+    <label>Статус:
+      <select id="fStatus">
+        <option value="активная">Активная</option>
+        <option value="не начатая">Не начатая</option>
+        <option value="завершена">Завершена</option>
+        <option value="отменена">Отменена</option>
+      </select>
+    </label>
+    <button id="btnCreate">Создать</button>
+    <button id="btnCancel">Отмена</button>
   </div>
 
   <div id="gantt"></div>
   <div id="taskTable" style="display:none;"></div>
 
-  <!-- Подключение Firebase SDK -->
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-    // ==== Конфигурация Firebase (замените на ваши данные) ====
+    // ==== Конфигурация Firebase ====
     const firebaseConfig = {
       apiKey: "AIzaSyAh3B5Bouyei9OVwzs-rh04cXonGz0m5k4",
-      authDomain: "https://globusarh-default-rtdb.firebaseio.com/",
+      authDomain: "globusarh.firebaseapp.com",
       databaseURL: "https://globusarh-default-rtdb.firebaseio.com",
       projectId: "globusarh",
       storageBucket: "globusarh.appspot.com",
-      messagingSenderId: "370557775455 ",
-      appId: "1:370557775455:web:042a439b8d6d3dadd275ea "
+      messagingSenderId: "370557775455",
+      appId: "1:370557775455:web:042a439b8d6d3dadd275ea"
     };
-
-    // Инициализация Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // ==== Глобальные переменные ====
     let employees = [];
     let tasks = [];
 
-    // ==== Загрузка задач из Firebase ====
+    // Загрузка задач
     function loadTasks() {
-      db.ref('tasks').on('value', snapshot => {
-        const data = snapshot.val() || {};
-        tasks = Object.values(data);
+      db.ref('tasks').on('value', snap => {
+        tasks = Object.values(snap.val() || {});
         extractEmployees();
         renderChart();
         renderTable();
       });
     }
-
-    // ==== Сохранение задач в Firebase ====
+    // Сохранение задач
     function saveTasks() {
       const updates = {};
       tasks.forEach(t => updates['tasks/' + t.id] = t);
-      db.ref().update(updates)
-        .then(() => alert('Данные сохранены'))
-        .catch(console.error);
+      db.ref().update(updates).then(() => alert('Данные сохранены'));
     }
-
-    // ==== Формируем список сотрудников для фильтра ====
+    // Список сотрудников
     function extractEmployees() {
       const names = [...new Set(tasks.map(t => t.employee))];
-      employees = names.map((n, i) => ({ id: i + 1, name: n }));
+      employees = names.map((n,i)=>({id:i+1,name:n}));
       const sel = document.getElementById('employeeFilter');
       sel.innerHTML = '<option value="">Все сотрудники</option>';
-      employees.forEach(e => {
+      employees.forEach(e=>{
         const opt = document.createElement('option');
-        opt.value = e.name; opt.textContent = e.name;
+        opt.value=e.name; opt.textContent=e.name;
         sel.append(opt);
       });
     }
-
-    // ==== Отрисовка диаграммы Gantt ====
+    // Диаграмма Gantt
     function renderChart() {
-      const container = document.getElementById('gantt');
-      container.style.display = ''; container.innerHTML = '';
-      if (!tasks.length) return;
-      const w = container.clientWidth - 40;
-      const minDate = new Date(Math.min(...tasks.map(t => new Date(t.start))));
-      const maxDate = new Date(Math.max(...tasks.map(t => new Date(t.end))));
-      const totalDays = (maxDate - minDate) / 86400000 + 1;
-
-      employees.forEach((emp, i) => {
-        const label = document.createElement('div');
-        label.textContent = emp.name;
-        label.style.position = 'absolute';
-        label.style.top = (i * 30 + 40) + 'px';
-        label.style.left = '0';
-        container.append(label);
+      const c = document.getElementById('gantt');
+      c.style.display=''; c.innerHTML='';
+      if(!tasks.length) return;
+      const w = c.clientWidth - 40;
+      const minD = new Date(Math.min(...tasks.map(t=>new Date(t.start))));
+      const maxD = new Date(Math.max(...tasks.map(t=>new Date(t.end))));
+      const total = (maxD - minD)/86400000 + 1;
+      employees.forEach((e,i)=>{
+        const lbl = document.createElement('div');
+        lbl.textContent=e.name;
+        lbl.style.position='absolute';
+        lbl.style.top=(i*30+40)+'px';
+        lbl.style.left='0';
+        c.append(lbl);
       });
-
-      tasks.forEach(t => {
-        const empIndex = employees.findIndex(e => e.name === t.employee);
-        if (empIndex < 0) return;
-        const sd = new Date(t.start), ed = new Date(t.end);
-        const left = 40 + ((sd - minDate) / 86400000) / totalDays * w;
-        const width = ((ed - sd) / 86400000) / totalDays * w;
+      tasks.forEach(t=>{
+        const idx = employees.findIndex(e=>e.name===t.employee);
+        if(idx<0) return;
+        const sd=new Date(t.start), ed=new Date(t.end);
+        const left = 40 + ((sd-minD)/86400000)/total * w;
+        const width = ((ed-sd)/86400000)/total * w;
         const bar = document.createElement('div');
-        bar.textContent = t.title;
-        bar.style.position = 'absolute';
-        bar.style.top = (empIndex * 30 + 40) + 'px';
-        bar.style.left = left + 'px';
-        bar.style.width = width + 'px';
-        bar.style.height = '20px';
-        bar.style.background = t.type === 'Отпуск' ? '#f9a825' : '#1e88e5';
-        bar.style.opacity = t.status === 'не начатая' ? '0.6' : '1';
-        bar.style.color = '#fff';
-        bar.style.padding = '2px';
-        container.append(bar);
+        bar.textContent=t.title;
+        bar.style.position='absolute';
+        bar.style.top=(idx*30+40)+'px';
+        bar.style.left=left+'px';
+        bar.style.width=width+'px';
+        bar.style.height='20px';
+        bar.style.background = t.type==='Отпуск'? '#f9a825':'#1e88e5';
+        bar.style.opacity = t.status==='не начатая'? '0.6':'1';
+        bar.style.color='#fff'; bar.style.padding='2px';
+        c.append(bar);
       });
-
-      container.style.position = 'relative';
-      container.style.height = (employees.length * 30 + 40) + 'px';
-      container.style.border = '1px solid #ccc';
+      c.style.position='relative';
+      c.style.height=(employees.length*30+40)+'px';
+      c.style.border='1px solid #ccc';
     }
-
-    // ==== Отрисовка таблицы ====
+    // Таблица
     function renderTable() {
-      const div = document.getElementById('taskTable');
-      div.style.display = ''; div.innerHTML = '';
+      const d = document.getElementById('taskTable');
+      d.style.display=''; d.innerHTML='';
       const tbl = document.createElement('table');
-      const thead = document.createElement('thead');
-      const headers = ['Сотрудник','Тип','Название','Начало','Конец','Комментарий','Статус','Действия'];
-      const trh = document.createElement('tr');
-      headers.forEach(h => {
-        const th = document.createElement('th'); th.textContent = h;
-        trh.append(th);
-      });
+      const ths=['Сотрудник','Тип','Название','Начало','Конец','Комментарий','Статус','Действия'];
+      const thead=document.createElement('thead'), trh=document.createElement('tr');
+      ths.forEach(h=>{const th=document.createElement('th'); th.textContent=h; trh.append(th);});
       thead.append(trh); tbl.append(thead);
-
-      const tb = document.createElement('tbody');
-      tasks.forEach((t, i) => {
-        const tr = document.createElement('tr');
-        ['employee','type','title','start','end','comment','status'].forEach(key => {
-          const td = document.createElement('td');
-          td.textContent = t[key];
-          tr.append(td);
+      const tb=document.createElement('tbody');
+      tasks.forEach((t,i)=>{
+        const tr=document.createElement('tr');
+        ['employee','type','title','start','end','comment','status'].forEach(k=>{
+          const td=document.createElement('td'); td.textContent=t[k]; tr.append(td);
         });
-        const tdAct = document.createElement('td');
-        const btnDel = document.createElement('button');
-        btnDel.textContent = 'Удалить';
-        btnDel.onclick = () => {
-          tasks.splice(i, 1);
-          saveTasks();
-        };
-        tdAct.append(btnDel);
-        tr.append(tdAct);
+        const tdAct=document.createElement('td');
+        const btn=document.createElement('button');
+        btn.textContent='Удалить';
+        btn.onclick=()=>{ tasks.splice(i,1); saveTasks(); };
+        tdAct.append(btn); tr.append(tdAct);
         tb.append(tr);
       });
-      tbl.append(tb); div.append(tbl);
+      tbl.append(tb); d.append(tbl);
     }
 
-    // ==== UI: переключение вида и кнопки ====
-    document.getElementById('btnChart').onclick = () => {
-      document.getElementById('gantt').style.display = '';
-      document.getElementById('taskTable').style.display = 'none';
+    // UI: переключение видов
+    document.getElementById('btnChart').onclick = ()=> {
+      document.getElementById('gantt').style.display='';
+      document.getElementById('taskTable').style.display='none';
     };
-    document.getElementById('btnTable').onclick = () => {
-      document.getElementById('gantt').style.display = 'none';
-      document.getElementById('taskTable').style.display = '';
+    document.getElementById('btnTable').onclick = ()=> {
+      document.getElementById('gantt').style.display='none';
+      document.getElementById('taskTable').style.display='';
     };
-    document.getElementById('btnBoth').onclick = () => {
-      document.getElementById('gantt').style.display = '';
-      document.getElementById('taskTable').style.display = '';
+    document.getElementById('btnBoth').onclick = ()=> {
+      document.getElementById('gantt').style.display='';
+      document.getElementById('taskTable').style.display='';
     };
     document.getElementById('btnSave').onclick = saveTasks;
 
-    // ==== Инициализация при загрузке страницы ====
+    // Добавление задачи
+    document.getElementById('btnAdd').onclick = ()=> {
+      document.getElementById('addForm').style.display='';
+    };
+    document.getElementById('btnCancel').onclick = ()=> {
+      document.getElementById('addForm').style.display='none';
+    };
+    document.getElementById('btnCreate').onclick = ()=> {
+      const newTask = {
+        id: Date.now(),
+        employee:document.getElementById('fEmployee').value,
+        type:document.getElementById('fType').value,
+        title:document.getElementById('fTitle').value,
+        start:document.getElementById('fStart').value,
+        end:document.getElementById('fEnd').value,
+        comment:document.getElementById('fComment').value,
+        status:document.getElementById('fStatus').value
+      };
+      tasks.push(newTask);
+      saveTasks();
+      document.getElementById('addForm').style.display='none';
+    };
+
     document.addEventListener('DOMContentLoaded', loadTasks);
   </script>
+
 </body>
 </html>
